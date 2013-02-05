@@ -1,0 +1,310 @@
+include Make.inc
+LD = ld
+mySRCdir = $(SRCdir)/lib
+#
+# override with libatlas.so only when atlas is built to one lib
+#
+DYNlibs = liblapack.so libf77blas.so libcblas.so libatlas.so 
+PTDYNlibs = liblapack.so libptf77blas.so libptcblas.so libatlas.so 
+CDYNlibs = liblapack.so libcblas.so libatlas.so 
+CPTDYNlibs = liblapack.so libptcblas.so libatlas.so 
+
+VER=3.10.0
+tmpd = RCW_tMp
+tarnam = atlas$(VER)_$(ARCH)
+tar : tarfile
+tarfile : $(tarnam).tar.bz2
+outdef=
+$(tarnam).tar.bz2 :
+	mkdir $(ARCH)
+	cd $(ARCH) ; mkdir include lib
+	cp $(TOPdir)/doc/LibReadme.txt $(ARCH)/README
+	cp $(TOPdir)/Make.$(ARCH) $(ARCH)/.
+	cp $(BINdir)/INSTALL_LOG/SUMMARY.LOG $(ARCH)/.
+	cp $(INCSdir)/cblas.h $(ARCH)/include/.
+	cp $(INCSdir)/clapack.h $(ARCH)/include/.
+	cp $(LIBdir)/libatlas.a $(ARCH)/lib/.
+	cp $(LIBdir)/libf77blas.a $(ARCH)/lib/.
+	cp $(LIBdir)/libcblas.a $(ARCH)/lib/.
+	cp $(LIBdir)/liblapack.a $(ARCH)/lib/.
+	- cp $(LIBdir)/libptcblas.a $(ARCH)/lib/.
+	- cp $(LIBdir)/libptf77blas.a $(ARCH)/lib/.
+	$(TAR) cf $(tarnam).tar $(ARCH)
+	rm -rf $(ARCH)
+	$(BZIP) --best $(tarnam).tar
+
+# ===================================================================
+# The following commands are to build dynamic/shared objects on Linux
+# using the gnu gcc or ld
+# ===================================================================
+ptshared: fat_ptshared
+shared : fat_shared
+cptshared : fat_cptshared
+cshared : fat_cshared
+
+#
+# These are a bunch of different ways to attempt to build a .so, try them all
+#
+LDTRY_WIN:
+	$(LD) $(LDFLAGS) -shared -soname $(LIBINSTdir)/$(outso) -o $(outso) \
+           -rpath-link $(LIBINSTdir) --output-def=$(outdef) \
+           --whole-archive $(libas) --no-whole-archive $(LIBS)
+GCCTRY_WIN:
+	$(GOODGCC) -shared -o $(outso) -Wl,--output-def=$(outdef) \
+           -Wl,"rpath-link $(LIBINSTdir)" \
+           -Wl,--whole-archive $(libas) -Wl,--no-whole-archive $(LIBS)
+GCCTRY_norp_WIN:
+	$(GOODGCC) -shared -o $(outso) -Wl,--output-def=$(outdef) \
+           -Wl,--whole-archive $(libas) -Wl,--no-whole-archive $(LIBS)
+#
+# TRYALL_WIN is going to just try a bunch of library combinations that may work
+# on gnu platforms, hopefully one does.  It also tests doing the link by
+# LD or gcc; some places don't use the gnu LD command, but gcc may still work
+#
+TRYALL_WIN :
+	if $(MAKE) GCCTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="$(F77SYSLIB) -lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all libs" ; \
+        elif $(MAKE) LDTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="$(F77SYSLIB) -lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt ld and all sys libs" ; \
+	elif $(MAKE) GCCTRY_norp_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="$(F77SYSLIB) -lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all libs and no rpath" ; \
+        elif $(MAKE) GCCTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="-lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all C libs" ; \
+        elif $(MAKE) LDTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="-lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt ld and -lc -lgcc" ; \
+        elif $(MAKE) GCCTRY_norp_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="-lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all C libs and no rpath" ; \
+        elif $(MAKE) GCCTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="$(F77SYSLIB) -lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all libs except -lgcc" ; \
+        elif $(MAKE) LDTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="$(F77SYSLIB) -lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt all libs except -lgcc" ; \
+        elif $(MAKE) GCCTRY_norp_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="$(F77SYSLIB) -lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all libs except -lgcc, no rpath" ; \
+        elif $(MAKE) GCCTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="-lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and -lc" ; \
+        elif $(MAKE) LDTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="-lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt ld and -lc" ; \
+        elif $(MAKE) GCCTRY_norp_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="-lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and -lc, no rpath" ; \
+        elif $(MAKE) LDTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="$(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt ld" ; \
+        elif $(MAKE) GCCTRY_norp_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+        LIBS="$(F77SYSLIB) -lkernel32" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt fortran and kernel32, no rpath" ; \
+        else \
+           $(MAKE) GCCTRY_WIN outso="$(outso)" libas="$(libas)" outdef="$(outdef)" \
+           LIBS="$(LIBS)" LIBINSTdir="$(LIBINSTdir)" ; \
+        fi
+#
+# These are a bunch of different ways to attempt to build a .so, try them all
+#
+LDTRY:
+	$(LD) $(LDFLAGS) -shared -soname $(LIBINSTdir)/$(outso) -o $(outso) \
+           -rpath-link $(LIBINSTdir)  \
+           --whole-archive $(libas) --no-whole-archive $(LIBS)
+GCCTRY:
+	$(GOODGCC) -shared -o $(outso)  \
+           -Wl,"rpath-link $(LIBINSTdir)" \
+           -Wl,--whole-archive $(libas) -Wl,--no-whole-archive $(LIBS)
+GCCTRY_norp:
+	$(GOODGCC) -shared -o $(outso)  \
+           -Wl,--whole-archive $(libas) -Wl,--no-whole-archive $(LIBS)
+#
+# TRYALL is going to just try a bunch of library combinations that may work
+# on gnu platforms, hopefully one does.  It also tests doing the link by
+# LD or gcc; some places don't use the gnu LD command, but gcc may still work
+#
+TRYALL :
+	if $(MAKE) GCCTRY outso="$(outso)" libas="$(libas)"  \
+        LIBS="$(F77SYSLIB) -lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all libs" ; \
+        elif $(MAKE) LDTRY outso="$(outso)" libas="$(libas)"  \
+        LIBS="$(F77SYSLIB) -lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt ld and all sys libs" ; \
+	elif $(MAKE) GCCTRY_norp outso="$(outso)" libas="$(libas)"  \
+        LIBS="$(F77SYSLIB) -lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all libs and no rpath" ; \
+        elif $(MAKE) GCCTRY outso="$(outso)" libas="$(libas)"  \
+        LIBS="-lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all C libs" ; \
+        elif $(MAKE) LDTRY outso="$(outso)" libas="$(libas)"  \
+        LIBS="-lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt ld and -lc -lgcc" ; \
+        elif $(MAKE) GCCTRY_norp outso="$(outso)" libas="$(libas)"  \
+        LIBS="-lc $(LIBS) -lgcc" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all C libs and no rpath" ; \
+        elif $(MAKE) GCCTRY outso="$(outso)" libas="$(libas)"  \
+        LIBS="$(F77SYSLIB) -lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all libs except -lgcc" ; \
+        elif $(MAKE) LDTRY outso="$(outso)" libas="$(libas)"  \
+        LIBS="$(F77SYSLIB) -lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt all libs except -lgcc" ; \
+        elif $(MAKE) GCCTRY_norp outso="$(outso)" libas="$(libas)"  \
+        LIBS="$(F77SYSLIB) -lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and all libs except -lgcc, no rpath" ; \
+        elif $(MAKE) GCCTRY outso="$(outso)" libas="$(libas)"  \
+        LIBS="-lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and -lc" ; \
+        elif $(MAKE) LDTRY outso="$(outso)" libas="$(libas)"  \
+        LIBS="-lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt ld and -lc" ; \
+        elif $(MAKE) GCCTRY_norp outso="$(outso)" libas="$(libas)"  \
+        LIBS="-lc $(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt gcc and -lc, no rpath" ; \
+        elif $(MAKE) LDTRY outso="$(outso)" libas="$(libas)"  \
+        LIBS="$(LIBS)" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt ld" ; \
+        elif $(MAKE) GCCTRY_norp outso="$(outso)" libas="$(libas)"  \
+        LIBS="$(F77SYSLIB) -lkernel32" LIBINSTdir="$(LIBINSTdir)"; then \
+           echo "$(outso) built wt fortran and kernel32, no rpath" ; \
+        else \
+           $(MAKE) GCCTRY outso="$(outso)" libas="$(libas)"  \
+           LIBS="$(LIBS)" LIBINSTdir="$(LIBINSTdir)" ; \
+        fi
+
+#
+# Builds one shared lib from all ATLAS files
+#
+fat_ptshared :                              # threaded target
+	$(MAKE) TRYALL outso=libtatlas.so \
+                libas="libptlapack.a libptf77blas.a libptcblas.a libatlas.a" \
+                LIBINSTdir="$(LIBINSTdir)"
+fat_shared :                                # serial target
+	$(MAKE) TRYALL outso=libsatlas.so \
+                libas="liblapack.a libf77blas.a libcblas.a libatlas.a" \
+                LIBINSTdir="$(LIBINSTdir)"
+#
+# Builds shared lib, not include fortran codes from LAPACK
+#
+fat_cptshared : libptclapack.a              # threaded target
+	$(MAKE) TRYALL outso=libtatlas.so \
+                libas="libptclapack.a libptcblas.a libatlas.a" \
+                LIBINSTdir="$(LIBINSTdir)"
+fat_cshared : libclapack.a                  # unthreaded target
+	$(MAKE) TRYALL outso=libsatlas.so \
+                libas="libclapack.a libcblas.a libatlas.a" \
+                LIBINSTdir="$(LIBINSTdir)"
+
+libclapack.a : liblapack.a
+	rm -rf clapack libclapack.a
+	mkdir clapack
+	cd clapack ; ar x ../liblapack.a
+	rm -f clapack/*f77wrap* clapack/*C2F*
+	ar r libclapack.a clapack/ATL_* clapack/clapack_*
+	rm -rf clapack
+libptclapack.a : libptlapack.a
+	rm -rf clapack libptclapack.a
+	mkdir clapack
+	cd clapack ; ar x ../libptlapack.a
+	rm -f clapack/*f77wrap* clapack/*C2F*
+	ar r libptclapack.a clapack/ATL_* clapack/clapack_*
+	rm -rf clapack
+
+#  ========================================================================
+#  The following commands build DLLs on Windows, as well as generating the
+#  .def files that MSVC++'s LIB needs to create import libraries.  My
+#  understanding is that after this process, you can issue a commands like:
+#     LIB /nologo /MACHINE:[x86,X64] /def/lib[s,t]atlas.def
+#  To create the import libraries.  For further details, see:
+#     https://sf.net/projects/math-atlas/forums/forum/1026734/topic/5349864
+#  ========================================================================
+dlls: sdlls
+ptdlls: tdlls
+tdlls:                          # threaded target
+	$(MAKE) TRYALL_WIN outso=libtatlas.dll outdef=libtatlas.def \
+                libas="libptlapack.a libptf77blas.a libptcblas.a libatlas.a" \
+                LIBINSTdir="$(LIBINSTdir)"
+sdlls:                          # serial target
+	$(MAKE) TRYALL_WIN outso=libsatlas.dll outdef=libsatlas.def \
+                libas="liblapack.a libf77blas.a libcblas.a libatlas.a" \
+                LIBINSTdir="$(LIBINSTdir)"
+cdlls: ctdlls csdlls
+ctdlls: libptclapack.a          # threaded target
+	$(MAKE) TRYALL_WIN outso=libtatlas.dll outdef=libtatlas.def \
+                libas="libptclapack.a libptcblas.a libatlas.a" \
+                LIBINSTdir="$(LIBINSTdir)"
+csdlls: libclapack.a            # serial target
+	$(MAKE) TRYALL_WIN outso=libsatlas.dll outdef=libsatlas.def \
+                libas="libclapack.a libcblas.a libatlas.a" \
+                LIBINSTdir="$(LIBINSTdir)"
+
+#  =======================================================================
+#  The following commands are to build dynamib libraries on OS X (in BETA)
+#  =======================================================================
+dylib :
+	rm -rf $(tmpd) ; mkdir $(tmpd)
+	cd $(tmpd) ; ar x ../liblapack.a 
+	cd $(tmpd) ; ar x ../libf77blas.a
+	cd $(tmpd) ; ar x ../libcblas.a 
+	cd $(tmpd) ; ar x ../libatlas.a
+	cd $(tmpd) ; $(LIBTOOL) -dynamic -o ../libsatlas.dylib \
+        -install_name $(LIBINSTdir)/libsatlas.dylib -current_version $(VER) \
+        -compatibility_version $(VER) *.o $(LIBS) $(F77SYSLIB)
+	rm -rf $(tmpd)
+ptdylib :
+	rm -rf $(tmpd) ; mkdir $(tmpd)
+	cd $(tmpd) ; ar x ../libptlapack.a 
+	cd $(tmpd) ; ar x ../libptf77blas.a 
+	cd $(tmpd) ; ar x ../libptcblas.a 
+	cd $(tmpd) ; ar x ../libatlas.a
+	cd $(tmpd) ; $(LIBTOOL) -dynamic -o ../libtatlas.dylib \
+        -install_name $(LIBINSTdir)/libtatlas.dylib -current_version $(VER) \
+        -compatibility_version $(VER) *.o $(LIBS) $(F77SYSLIB)
+	rm -rf $(tmpd)
+cdylib : libclapack.a
+	rm -rf $(tmpd) ; mkdir $(tmpd)
+	cd $(tmpd) ; ar x ../libclapack.a 
+	cd $(tmpd) ; ar x ../libcblas.a 
+	cd $(tmpd) ; ar x ../libatlas.a
+	cd $(tmpd) ; $(LIBTOOL) -dynamic -o ../libsatlas.dylib \
+        -install_name $(LIBINSTdir)/libsatlas.dylib -current_version $(VER) \
+        -compatibility_version $(VER) *.o $(LIBS)
+	rm -rf $(tmpd)
+ptcdylib : libptclapack.a
+	rm -rf $(tmpd) ; mkdir $(tmpd)
+	cd $(tmpd) ; ar x ../libptclapack.a
+	cd $(tmpd) ; ar x ../libptcblas.a 
+	cd $(tmpd) ; ar x ../libatlas.a
+	cd $(tmpd) ; $(LIBTOOL) -dynamic -o ../libtatlas.dylib \
+        -install_name $(LIBINSTdir)/libtatlas.dylib -current_version $(VER) \
+        -compatibility_version $(VER) *.o $(LIBS)
+	rm -rf $(tmpd)
+
+libclapack.dylib : libcblas.dylib libatlas.dylib liblapack.a
+	rm -rf $(tmpd) ; mkdir $(tmpd)
+	cd $(tmpd) ; ar x ../liblapack.a
+	rm -f $(tmpd)/*C2F $(tmpd)/*f77wrap*
+	cd $(tmpd) ; libtool -dynamic -o ../libclapack.dylib \
+           -install_name $(LIBINSTdir)/libclapack.dylib \
+           -compatibility_version $(VER) -current_version $(VER) \
+           *.o ../libcblas.dylib ../libatlas.dylib $(LIBS)
+	rm -rf $(tmpd)
+xtst_lp: $(DYNlibs)
+	$(ICC) $(CDEFS) -o $@ $(mySRCdir)/qr.c $(DYNlibs) -Wl,--rpath ./
+xtst : $(DYNlibs)
+	$(ICC) $(CDEFS) -o $@ $(mySRCdir)/test_dynlink.c $(DYNlibs) \
+           -Wl,--rpath ./
+
+xtry_lp:
+	$(ICC) $(CDEFS) -o $@ $(mySRCdir)/qr.c libsatlas.so -Wl,--rpath ./
+xtry_lp_pt:
+	$(ICC) $(CDEFS) -o $@ $(mySRCdir)/qr.c libtatlas.so -Wl,--rpath ./
+xtry :
+	$(ICC) $(CDEFS) -o $@ $(mySRCdir)/test_dynlink.c libsatlas.so \
+           -Wl,--rpath ./
+xtry_pt :
+	$(ICC) $(CDEFS) -o $@ $(mySRCdir)/test_dynlink.c libtatlas.so \
+           -Wl,--rpath ./

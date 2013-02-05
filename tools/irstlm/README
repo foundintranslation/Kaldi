@@ -1,0 +1,51 @@
+IRSTLM Toolkit 
+
+CONTENT:
+
+- src: source code
+- scripts: supporting scripts
+- doc: documentation (in Latex) and in pdf (to be generated)
+- bin: binaries (to be generated) and scripts
+- lib: libraries (to be generated)
+- readme: this file
+
+DOCUMENTATION
+
+A User Manual is available under http://hlt.fbk.eu/en/irstlm
+
+The data for the examples described in the User Manual are 
+available under http://hlt.fbk.eu/en/irstlm
+
+HOW TO INSTALL
+
+1. Run the following commandsi
+# set parameter force to the value "--force" if you want to recreate all links to the autotools
+step 0: sh regenerate-makefiles.sh [--force]
+
+# run "configure --help" to get more details on the compilation options
+step 1: ./configure [--prefix=/path/where/to/install] [--enable-caching] [--enable-profiling] [--enable-doc] [--disable-trace] [--disable-debugging] 
+
+step 2: make
+
+step 3: make install
+
+It will generate the irstlm library and commands, respectively,
+under the directories PREFIX/lib and PREFIX/bin.
+
+If enabled and PdfLatex is installed, it will generate 
+the user manual (in pdf) under the directory ./doc
+
+Although caching is not enabled by default, it is highly recommended
+to activate through its compilation flag (--enable-caching).
+
+HOW TO CONTRIBUTE
+
+If you wish to contribute to the Open Source IRSTLM
+toolkit just tell me and I will be happy to give you
+writing permission to the respective svn repository.
+
+
+Marcello Federico
+FBK-irst, Trento, ITALY
+email: federico AT fbk DOT eu
+

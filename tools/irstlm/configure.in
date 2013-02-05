@@ -1,0 +1,133 @@
+AC_INIT(src)
+
+CFLAGS=""
+CPPFLAGS=""
+CXXFLAGS=""
+
+AM_CONFIG_HEADER(config.h)
+AM_INIT_AUTOMAKE(irstlm, 5.50.02)
+WEBSITE="http://hlt.fbk.eu/en/irstlm"
+
+AC_CONFIG_MACRO_DIR([m4])
+
+AC_PROG_CXX
+AC_PROG_CXXCPP
+AC_LANG_CPLUSPLUS
+
+AC_DISABLE_SHARED 
+AC_PROG_LIBTOOL
+# Shared library are disabled for default
+#LT_INIT([disable-shared])
+
+AC_CHECK_TOOL(PDFLATEX,pdflatex,"no")
+AC_CHECK_TOOL(BIBTEX,bibtex,"no")
+
+AC_ARG_ENABLE([trace],
+    AS_HELP_STRING([--disable-trace], [Disable trace]))
+
+AC_ARG_ENABLE([debugging],
+    AS_HELP_STRING([--disable-debugging], [Disable debugging]))
+
+AC_ARG_ENABLE([doc],
+    AS_HELP_STRING([--enable-doc], [enable creation of documentation]))
+
+AC_ARG_ENABLE(profiling,
+            [AC_HELP_STRING([--enable-profiling], [irstlm will dump profiling info])])
+
+AC_ARG_ENABLE(caching,
+            [AC_HELP_STRING([--enable-caching], [irstlm will use prob caches to store probs and other info])])
+
+AC_ARG_ENABLE(optimization,
+            [AC_HELP_STRING([--enable-optimization], [compile with -O3 flag])])
+
+AC_ARG_WITH(zlib,
+            [AC_HELP_STRING([--with-zlib=PATH], [(optional) path to zlib])],
+            [with_zlib=$withval],
+            [with_zlib=no]
+           )
+
+AM_CONDITIONAL([am__fastdepCC], false)
+AM_CONDITIONAL([WITH_THREADS],false)
+
+if test "x$enable_trace" != 'xno'
+then
+    AC_MSG_NOTICE([trace enabled (default)])
+    CPPFLAGS="$CPPFLAGS -DTRACE_ENABLE=1" 
+else
+    AC_MSG_NOTICE([trace disabled, most regression test will fail])
+fi
+
+if test "x$enable_debugging" != 'xno'
+then
+    AC_MSG_NOTICE([debugging enabled, compilation with "-g -O2" (default)])
+    CPPFLAGS="$CPPFLAGS -g -O2"
+else
+    AC_MSG_NOTICE([debugging disabled])
+fi
+
+if test "x$enable_profiling" = 'xyes'
+then
+    AC_MSG_NOTICE([profiling enabled])
+    CPPFLAGS="$CPPFLAGS -pg";
+    LDFLAGS="$LDFLAGS -pg"
+else
+    AC_MSG_NOTICE([profiling disabled (default)])
+fi
+
+if test "x$enable_caching" = 'xyes'
+then
+    AC_MSG_NOTICE([caching enabled])
+    CPPFLAGS="$CPPFLAGS -DPS_CACHE_ENABLE=1 -DMDIADAPTLM_CACHE_ENABLE=1";
+    LDFLAGS="$LDFLAGS"
+else
+    AC_MSG_NOTICE([caching disabled (default)])
+fi
+
+if test "x$enable_optimization" = 'xyes'
+then
+    AC_MSG_NOTICE([optimization enabled])
+    CPPFLAGS="$CPPFLAGS -O3";
+    LDFLAGS="$LDFLAGS -O3"
+else
+    AC_MSG_NOTICE([optimization disabled (default)])
+fi
+
+AC_MSG_NOTICE([Building non-threaded irstlm.])
+
+AC_CHECK_HEADERS([getopt.h],
+            [AM_CONDITIONAL([WITH_MERT],true)],
+            [AC_MSG_WARN([Cannot find getopt.h - disabling new mert])])
+
+if test "x$with_zlib" != 'xno'
+then
+  CPPFLAGS="$CPPFLAGS -I${with_zlib}/include"
+  LDFLAGS="$LDFLAGS -L${with_zlib}/lib"
+fi
+
+LIBS="$LIBS -lz"
+
+
+AC_SUBST(wrapperbindir,$prefix/bin)
+AC_SUBST(transform,'s/_lm/-lm/')
+
+
+AM_CONDITIONAL([DOC_COMPILATION],false)
+if test "x$enable_doc" = 'xyes'
+then
+    AM_CONDITIONAL([DOC_COMPILATION],true)
+    if test "x$PDFLATEX" != "xno" && test "x$BIBTEX" != "xno"
+    then
+	AC_MSG_NOTICE([pdflatex is available])
+        AC_MSG_NOTICE([documentation will be created])
+    else
+	AM_CONDITIONAL([DOC_COMPILATION],false)
+	AC_MSG_NOTICE([either pdflatex or bibtex is not available])
+        AC_MSG_NOTICE([documentation will not be created (default); get it through the website $WEBSITE])
+    fi
+else
+    AC_MSG_NOTICE([documentation will not be created (default); get it through the website $WEBSITE])
+fi
+
+AC_CONFIG_FILES(Makefile src/Makefile scripts/Makefile doc/Makefile)
+
+AC_OUTPUT()

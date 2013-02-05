@@ -1,0 +1,1349 @@
+\documentclass[11pt]{article}
+\usepackage{fullpage}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{epsf}
+\usepackage{graphicx}
+\usepackage{version}
+ 
+\newcommand{\versionnumber}{5.60.01}
+\newcommand{\COMMENT}[1]{}
+
+\def\thesubsubsection{\thesubsection.\alph{subsubsection}} 
+
+\begin{document}   
+
+\title{IRST Language Modeling Toolkit \\ Version \versionnumber\\USER MANUAL}
+			         
+\author{M. Federico, N. Bertoldi, M. Cettolo\\FBK-irst, Trento, Italy}			       
+\date{\today}
+ 
+\maketitle
+%% INTRODUCTION %%%%
+
+\vspace*{3cm}
+\noindent
+This manual together with source code, executables, examples and regression tests can be accessed in the official website of IRSTLM Toolkit:
+
+\bigskip
+\centerline{\bf http://hlt.fbk.eu/en/irstlm}
+
+\newpage
+\section{Introduction}
+
+This manual illustrates the functionalities of  the IRST Language  Modeling (LM)  toolkit. It  should  
+put you quickly  in  the condition of:
+\begin{itemize}
+\item extracting the dictionary from a corpus
+\item extracting n-gram statistics from it
+\item estimating n-gram LMs using different smoothing criteria
+\item estimating and handling gigantic LMs
+\item adapting a LM on specific application data
+\item saving a  LM into a compact binary file
+\item pruning a LM
+\item reducing LM size through quantization
+\item querying a LM through a command or script
+\end{itemize}
+
+\noindent
+Among  state-of-the-art  $n$-gram  smoothing  techniques,  the  IRST LM toolkit features LM  very efficient 
+data structures to handle very large LMs and adaptation  methods which  can  be effective when limited task-related  data are available. 
+
+The IRST Language Modeling Toolkit features algorithms and data structures suitable to estimate, 
+store, and access very  large LMs.  Our software has been integrated into a popular open source 
+SMT decoder  called {\tt Moses}\footnote{http://www.statmt.org/moses/}, and is compatible with LMs
+created with other tools, such as the SRILM Tooolkit\footnote{http://www.speech.sri.com/projects/srilm}
+
+
+\paragraph{Acknowledgments.}Users of this toolkit  might cite in their publications:
+\begin{quote}
+M. Federico,  N. Bertoldi,  M. Cettolo, {\em IRSTLM: an Open Source Toolkit for Handling Large Scale Language Models}, Proceedings of Interspeech, Brisbane, Australia, 2008.
+\end{quote}
+
+\noindent
+References to introductory material on $n$-gram LMs are given in the appendix. 
+
+%% GETTING STARTED %%%%
+
+\newpage
+\section{Installation}
+\label{sec:installation}
+In order to install the IRSTLM on your machine, please perform the following steps.
+
+\subsection{Step 0: preparation of the configuration}
+\begin{verbatim}
+$> sh regenerate-makefiles.sh [--force]
+\end{verbatim}
+
+\paragraph{Warning:} Run with the "--force" parameter if you want to recreate all links to the autotools
+
+\subsection{Step 1: configuration of the compilation}
+\begin{verbatim}
+$> ./configure [--prefix=/path/where/to/install]
+                         [--enable-caching] 
+                         [--enable-profiling]
+                         [--enable-doc]
+                         [--disable-trace]
+                         [--disable-debugging]
+\end{verbatim}
+
+\noindent
+Run the following command to get more details on the compilation options
+\begin{verbatim}
+$> configure --help
+\end{verbatim}
+
+\subsection{Step 2: compilation}
+
+\begin{verbatim}
+$> make clean
+$> make
+\end{verbatim}
+
+\subsection{Step 3: Installation}
+\begin{verbatim}
+$> make install
+\end{verbatim}
+
+\noindent
+The IRSTLM library and commands are generated,  respectively, under the directories\newline {\tt /path/where/to/install/lib} and {\tt /path/where/to/install/bin}.
+
+\noindent
+If enabled and PdfLatex is installed, this user manual (in pdf) is generated under the directory\newline {\tt /path/where/to/install/doc}.
+
+\noindent
+Although caching is not enabled by default, it is highly recommended
+to activate through its compilation flag "{\tt --enable-caching}".
+
+
+\subsection{Step 4: Environment Settings}
+Set the environment variable {\tt IRSTLM} to {\tt /path/where/to/install}.
+
+\noindent
+Include the command directory {\tt /path/where/to/install/bin} into your environment variable {\tt PATH}.
+
+\newpage
+\section{Getting started}
+
+\paragraph{Environment Settings}
+We assume that all steps for installation described in Section~\ref{sec:installation} have been performed correctly. In particular, the environment variable {\tt IRSTLM} is set , and that environment variable {\tt PATH} includes the command directory {\tt IRSTLM/bin}.
+
+\noindent
+Data sets used in the examples can be  found in an archive you can download from the official website of IRSTLM toolkit.
+
+
+
+
+\paragraph{Preparation of Training Data}
+In order to estimate a Language Model, you first need to prepare your training corpus. The corpus just consists of a text.
+We assume that the text is already preprocessed according to the user needs; this means that lowercasing, uppercasing, tokenization, and any other text transformation has to be performed beforehand with other tools.
+
+\noindent
+You can only decide whether you are interested that IRSTLM toolkit is aware
+of sentence boundaries, i.e. where a sentence starts and ends. Otherwise,
+the toolkit considers the corpus as one continuous stream of text, and does
+not identify sentence splits.  The following script adds start and end
+symbols ({\tt <s>} and {\tt </s>}, respectively, which should be considered
+reserved symbols, that is used only as delimiters) to all
+sentences in your training corpus.
+\begin{verbatim}
+$> add-start-end.sh < your-text-file 
+\end{verbatim}
+IRSTLM toolkit does not compute probabilities for cross-sentence $n$-grams,
+i.e. any $n$-gram including the pair {\tt </s>  <s>}.
+
+
+\paragraph{Training our first LM}
+\noindent
+We  are now ready to estimate a  3-gram (trigram)  LM by  running the command:
+
+\begin{verbatim}
+$> tlm -tr="gunzip -c train.gz" -n=3 -lm=wb -te=test
+\end{verbatim}
+\noindent
+which produces the output:
+\begin{verbatim}
+n=49984 LP=301734.5406 PP=418.4772517 OOVRate=0.05007602433
+\end{verbatim}
+\noindent
+The output shows the number of  words in the test set, the LM log-probability, the LM perplexity  
+and the out-of-vocabulary rate  of the test set.
+
+\noindent
+If you need  to train and test different language  models on the same data, a  more efficient 
+way to  proceed is to first  create an $n$-gram table of the training data:
+\begin{verbatim}
+$> ngt -i="gunzip -c train.gz" -n=3 -o=train.www -b=yes
+\end{verbatim}
+\noindent
+The command {\tt ngt} reads an  input text file, creates an  $n$-gram table of specified size ({\tt -n=3}), and 
+saves it in binary format ({\tt -b=yes}) into a specified output file.
+
+\noindent
+Now,  the  LM can  be  estimated and evaluated more quickly:
+\begin{verbatim}
+$> tlm -tr=train.www -n=3 -lm=wb -te=test
+\end{verbatim}
+
+\noindent
+Once  estimated, a  LM can  be also saved in the standard ARPA text format:
+\begin{verbatim}
+$> tlm -tr=train.www -n=3 -lm=wb  -o=train.lm
+\end{verbatim}
+or in a binary format 
+\begin{verbatim}
+$> tlm -tr=train.www -n=3 -lm=wb  -obin=train.blm
+\end{verbatim}
+
+\noindent
+(Remark: the  binary format formerly used by the IRST speech recognizer is still available, through the option
+{\tt -oasr <filename>}, but is no more supported.)
+
+\newpage
+\section{More on ngt}
+Given a text corpus we can compute its dictionary and word frequencies
+with the command:
+
+\begin{verbatim}
+$> dict -i="gunzip -c train.gz" -o=train.dict -f=yes
+\end{verbatim}
+
+\noindent
+For speech recognition applications, it  can be often the case to limit the LM dictionary  only to the top frequent, let us say,
+10K words. We can obtain such a list by:
+\begin{verbatim}
+$> dict -i="gunzip -c train.gz" -o=top10k -pr=10000
+\end{verbatim}
+
+
+\noindent
+{\bf Notice}: the list will also include the start/end-sentence symbols.\\
+
+\noindent
+An alternative pruning strategy is to filter out words occurring less or equal than a specified 
+count. The following example removes the word occurring $\le$ 5 times and keeps
+the top frequent 10K (at most) of the others:
+\begin{verbatim}
+$> dict -i="gunzip -c train.gz" -o=top10k5f -pr=10000 -pf=5
+\end{verbatim}
+
+
+\noindent
+Statistics about the frequency of words inside a corpus can be gathered through  the command {\tt dict}
+with the option {\tt -curve=yes}, while out-of-vocabulary rate statistics over a test set can be computed with
+the option {\tt -TestFile=<sample>}.  The following example illustrates both features:
+\begin{verbatim}
+$> dict -i="gunzip -c train.gz"  -Curve=yes -TestFile=test
+
+**************** DICTIONARY GROWTH CURVE ****************
+Freq    Entries Percent       Freq    OOV onTest
+>0      15058    100.00%      <1        5.01%
+>1      10113     67.16%      <2        7.64%
+>2      8057      53.51%      <3        8.89%
+>3      6948      46.14%      <4        9.96%
+>4      6207      41.22%      <5       10.72%
+>5      5644      37.48%      <6       11.67%
+>6      5205      34.57%      <7       12.18%
+>7      4823      32.03%      <8       12.72%
+>8      4523      30.04%      <9       13.47%
+>9      4224      28.05%      <10      14.10%
+*********************************************************
+
+\end{verbatim}
+
+\noindent
+A new  $n$-gram table for the  limited dictionary can  be computed with {\tt ngt} by specifying 
+the sub-dictionary:
+\begin{verbatim}
+$> ngt -i=train.www -sd=top10k -n=3 -o=train.10k.www -b=yes
+\end{verbatim}
+The command replaces  all words outside  top10K with  the special
+out-of-vocabulary symbol {\tt \_unk\_}.
+
+\noindent
+Another useful feature of ngt is the merging of two $n$-gram tables. Assume that we have 
+split our training corpus into files  {\tt text-a} and file {\tt text-b} and have computed $n$-gram 
+tables for both files, we can merge them with the option {\tt -aug}:
+\begin{verbatim}
+$> ngt -i="gunzip -c text-a.gz" -n=3 -o=text-a.www -b=yes
+$> ngt -i="gunzip -c text-b.gz" -n=3 -o=text-b.www -b=yes
+$> ngt -i=text-a.www -aug=text-b.www -n=3 -o=text.www -b=yes
+\end{verbatim}
+
+\paragraph{Warning:} Note that if the concatenation of {\tt text-a.gz} and {\tt text-b.gz} is equal to {\tt train.gz} the resulting $n$-gram tables
+{\tt text.www} and {\tt train.www} can slightly differ. This happens because during the construction of each single $n$-gram table few $n$-grams are automatically added to make it consistent for further computation.
+
+
+%% MORE ON TLM %%%%
+\newpage
+\section{More on tlm}
+Language models have to  cope with out-of-vocabulary words, that is internally represented
+with the word class  {\tt \_unk\_}.  In order  to
+compare perplexity of LMs having  different vocabulary size it is better
+to define  a conventional dictionary  size, or dictionary  upper bound
+size,  trough the  parameter  ({\tt -dub}).  In  the  following example,  we
+compare the perplexity of the full vocabulary LM against the perplexity of the
+LM estimated over the more frequent 10K-words. In our comparison, we assume a dictionary 
+upper bound of one million words.
+
+\begin{verbatim}
+$>tlm -tr=train.10k.www -n=3 -lm=wb -te=test -dub=1000000
+  n=49984 LP=342160.8721 PP=939.5565162 OVVRate=0.07666453265
+
+$>tlm -tr=train.www -n=3 -lm=wb -te=test -dub=1000000
+  n=49984 LP=336276.7842 PP=835.2144716 OVVRate=0.05007602433
+\end{verbatim}
+
+
+\noindent
+The  large  difference  in  perplexity  between the two LMs is   explained  by  the 
+significantly higher  OOV rate of the 10K-word LM.
+
+\noindent
+N-gram LMs generally apply frequency smoothing techniques, and combine
+smoothed frequencies according to  two main schemes: interpolation and
+back-off.  The  toolkit assumes interpolation
+as default.  The back-off  scheme is computationally more costly but
+often provides better performance. It  can be activated with the option
+{\tt -bo=yes}, e.g.:
+
+\begin{verbatim}
+$>tlm -tr=train.10k.www -n=3 -lm=wb -te=test -dub=1000000 -bo=yes
+  n=49984 LP=337278.3227 PP=852.1186066 OVVRate=0.07666453265
+\end{verbatim}
+
+
+\noindent
+This toolkit implements several frequency smoothing methods, which are
+specified  by  the  parameter  {\tt -lm}.  Three  methods  are  particularly
+recommended:
+\begin{itemize}
+\item [a)] {\bf Modified shift-beta}, also known as  ``improved kneser-ney smoothing''.  
+This smoothing scheme gives top performance when training data is not 
+very sparse but it is more time and memory consuming during the estimation phase: 
+
+\begin{verbatim}
+$>tlm -tr=train.www -n=3 -lm=msb -te=test -dub=1000000 -bo=yes
+  n=49984 LP=321877.3411 PP=626.1609806 OVVRate=0.05007602433
+\end{verbatim}
+
+
+\item [b)] {\bf Witten Bell smoothing}. This is an excellent smoothing
+   method which works well in every data condition and is much less time and memory consuming:
+
+\begin{verbatim}
+$> tlm -tr=train.www -n=3 -lm=wb -te=test -dub=1000000  -bo=yes
+  n=49984 LP=331577.2279 PP=760.2652095 OVVRate=0.05007602433
+\end{verbatim}
+
+\item [c)] {\bf Shift-beta smoothing}. This smoothing method is a simpler and cheaper version
+of the Modified shift-beta method and works sometimes better than Witten-Bell method: 
+
+\begin{verbatim}
+$> tlm -tr=train.www -n=3 -lm=sb -te=test -dub=1000000  -bo=yes
+  n=49984 LP=334724.5032 PP=809.6750442 OVVRate=0.05007602433
+\end{verbatim}
+
+\noindent
+Moreover, the non linear smoothing parameter $\beta$ can be specified with the option {\tt -beta}:
+\begin{verbatim}
+$> tlm -tr=train.www -n=3 -lm=sb -beta=0.001 -te=test -dub=1000000  
+       -bo=yes
+  n=49984 LP=449339.8282 PP=8019.836058 OVVRate=0.05007602433
+\end{verbatim}
+This could be helpful in case we need to use language models with very limited frequency smoothing.
+
+\end{itemize}
+\subsection*{Limited Vocabulary}
+\noindent
+Using an  n-gram table  with a fixed  or limited  dictionary  will cause
+some performance  degradation, as LM smoothing  statistics result
+slightly distorted. A  valid alternative is to estimate  the LM on the
+full dictionary of the training corpus and to use a limited dictionary
+just when  saving the  LM on a  file.  This  can be achieved  with the
+option {\tt -d} (or {\tt -dictionary}):
+\begin{verbatim}
+$> tlm -tr=train.www -n=3 -lm=msb -bo=y -te=test -o=train.lm -d=top10k
+\end{verbatim}
+
+%% LM ADAPTATION %%%%
+\newpage
+\section{LM Adaptation}
+Language model adaptation can be  applied when little training data is given for the 
+task at hand, but much more data from other less related sources is available.  {\tt tlm} supports two adaptation methods.
+
+\subsection{Minimum Discriminative Information Adaptation}
+MDI adaptation  is used  when domain related  data is very  little but
+enough to  estimate a  unigram LM.  Basically,  the n-gram probs  of a
+general  purpose (background)  LM are  scaled so  that they  match the
+target unigram distribution.
+	
+\noindent	 
+Relevant parameters:
+\begin{itemize}
+\item {\tt -ar=value}: the adaptation {\tt rate},  a real number ranging 
+ from 0 (=no adaptation) to 1 (=strong adaptation).
+
+\item {\tt -ad=file}: the  adaptation file,  either a text  or a
+  unigram table.
+
+\item {\tt -ao=y}: open vocabulary mode, which  must be set if the adaptation file
+ might contain new words to be added to the basic dictionary.
+\end{itemize}
+
+\noindent
+As an example, we apply MDI adaptation on the ``adapt'' file:
+\begin{small}
+\begin{verbatim}
+$> tlm -tr=train.www -lm=wb -n=3 -te=test -dub=1000000 -ad=adapt -ar=0.8 -ao=yes
+   n=49984 LP=326327.8053 PP=684.470312 OVVRate=0.04193341869
+\end{verbatim}
+\end{small}
+
+\noindent
+\paragraph{Warning:}  modified shift-beta  smoothing  cannot  be applied  in  open
+vocabulary mode  ({\tt -ao=yes}).  If  this is the  case, you  should either
+change  smoothing method  or simply  add  the adaptation  text to  the
+background LM (use {\tt -aug} parameter  of {\tt ngt}). In
+general, this solution should  provide better performance.
+\begin{small}
+\begin{verbatim}
+$> ngt -i=train.www -aug=adapt -o=train-adapt.www -n=3 -b=yes
+$> tlm -tr=train-adapt.www -lm=msb -n=3 -te=test -dub=1000000 -ad=adapt -ar=0.8
+  n=49984 LP=312276.1746 PP=516.7311396 OVVRate=0.04193341869
+\end{verbatim}
+\end{small}
+
+\subsection{Mixture Adaptation}
+
+\noindent
+Mixture adaptation  is useful  when you have  enough training  data to
+estimate a  bigram or  trigram LM and  you also have  data collections
+from other domains.
+
+\noindent
+Relevant parameters:
+\begin{itemize}
+\item {\tt-lm=mix} : specifies mixture smoothing method
+\item {\tt -slmi=<filename>}: specifies filename with information about LMs to combine.
+\end{itemize}
+
+\noindent
+In the example directory, the file {\tt sublmi} contains the following lines:
+\begin{verbatim}
+2
+-slm=msb -str=adapt -sp=0
+-slm=msb -str=train.www -sp=0
+\end{verbatim}
+
+\noindent
+This means  that we use train a  mixture model on the  {\tt adapt} data set and
+combine it  with the train data. For each data  set the desired
+smoothing method is specified  (disregard the parameter {\tt -sp}). The file
+used for adaptation is the one in FIRST position.
+
+\begin{verbatim}
+$> tlm -tr=train.www -lm=mix -slmi=sublm -n=3 -te=test -dub=1000000
+  n=49984 LP=307199.3273 PP=466.8244383 OVVRate=0.04193341869
+\end{verbatim}
+
+\noindent
+{\bf Warning}: for  computational reasons it  is expected that  the $n$-gram
+table  specified by {\tt -tr}  contains AT  LEAST the  $n$-grams of  the last
+table specified in the slmi file, i.e. {\tt train.www} in  the example.
+Faster computations are achieved by putting the largest dataset as the
+last sub-model in the list and the union of all data sets as training
+file.
+
+\noindent
+It is  also IMPORTANT  that a  large {\tt -dub} value  is specified  so that
+probabilities  of  sub-LMs  can  be  correctly  computed  in  case  of
+out-of-vocabulary words.
+
+%% ESTIMATING GIGANTIC LMs %%%%
+\newpage
+\section{Estimating Gigantic LMs}
+\label{sec:giganticLM}
+LM estimation starts with the collection of n-grams and their frequency counters. Then, 
+smoothing parameters are estimated for each n-gram level; infrequent n-grams are
+possibly pruned and, finally, a LM file is created containing n-grams with probabilities and 
+back-off weights.  This procedure can be very demanding in terms of memory and
+time if it applied on huge corpora.   We provide here a way to split LM training  into smaller and independent steps, that can be easily distributed among independent processes. The  
+procedure relies on a training scripts that makes little use of computer RAM and implements 
+the  Witten-Bell smoothing method in an exact way.  
+
+\noindent
+Before starting, let us create a working directory under {\tt examples}, as many files will be created:
+
+\begin{verbatim}
+$> mkdir stat
+\end{verbatim}
+
+The script to generate the LM is:
+
+\begin{verbatim}
+$> build-lm.sh -i "gunzip -c train.gz" -n 3  -o train.ilm.gz -k 5
+\end{verbatim}
+where the available options are:
+
+\begin{verbatim}
+-i    Input training file e.g. 'gunzip -c train.gz'
+-o    Output gzipped LM, e.g. lm.gz
+-k    Number of splits (default 5)
+-n    Order of language model (default 3)
+-t    Directory for temporary files (default ./stat)
+-p    Prune singleton n-grams (default false)
+-s    Smoothing: witten-bell (default), kneser-ney, improved-kneser-ney 
+-b    Include sentence boundary n-grams (optional)
+-d    Define subdictionary for n-grams (optional)
+-v    Verbose
+\end{verbatim}
+
+\noindent
+The script splits the estimation procedure into 5 distinct jobs, that are explained in
+the following section. There are other options that can be used. We recommend for instance to use pruning of singletons to get smaller LM files. 
+Notice that {\tt build-lm.sh} produces a LM file {\tt train.ilm.gz} that is NOT in the final ARPA format, but in
+an intermediate format called {\tt iARPA}, that is recognized by the {\tt compile-lm} 
+command and by the Moses SMT decoder running with IRSTLM. 
+To convert the file into the standard ARPA format you can use the command:
+
+\begin{verbatim}
+$> compile-lm train.ilm.gz --text yes train.lm 
+\end{verbatim}
+this will create the proper ARPA file {\tt lm-final}.
+To create a gzipped file you might also use:
+\begin{verbatim}
+$> compile-lm train.ilm.gz --text yes /dev/stdout | gzip -c > train.lm.gz
+\end{verbatim}
+
+
+\noindent
+In the following sections, we will discuss on LM file formats, on compiling LMs into a 
+more compact and efficient binary format, and on querying LMs.
+
+\subsection{Estimating a LM with a Partial Dictionary}
+
+A sub-dictionary can be defined by just taking words occurring more than 5 times ({\tt -pf=5})
+and at most the top frequent 5000 words ({\tt -pr=5000}):
+\begin{verbatim}
+$>dict -i="gunzip -c train.gz" -o=sdict -pr=5000 -pf=5 
+\end{verbatim}
+
+
+\noindent
+The LM can be restricted to the defined sub-dictionary with the 
+command {\tt build-lm.sh} by using the option {\tt -d}: 
+\begin{verbatim}
+$> build-lm.sh -i "gunzip -c train.gz" -n 3  -o  train.ilm.gz -k 5 -p -d sdict 
+\end{verbatim}
+
+\noindent
+Notice that all words outside the sub-dictionary will be mapped into the {\tt <unk>}
+class, the probability of which will be directly estimated from the corpus statistics.
+A preferable alternative to this approach is to estimate a large LM and then to filter
+it according to a list of words (see Filtering a LM).
+
+
+%%%% LM FORMATS %%%%%%%%%%%
+\newpage
+\section{LM File Formats}
+The toolkit supports three output format of LMs. These formats have the
+purpose of permitting  the use of LMs by  external programs.  External
+programs could in principle estimate the LM from an $n$-gram table before
+using it, but this would take much more time and memory! So the best thing
+to do is to first  estimate the LM, and then compile it into a binary format   
+that is more compact and that can be quickly loaded and queried by the 
+external program.
+
+
+\subsection{ARPA Format}
+This format was  introduced in DARPA ASR evaluations  to exchange LMs.
+ARPA format  is also  supported by the  SRI LM  Toolkit. It is  a text
+format which is rather costly in terms of memory. There is no limit to
+the size $n$ of $n$-grams.
+
+\subsection{qARPA Format}
+This extends the ARPA format by including codebooks that quantize 
+probabilities and back-off weights of each $n$-gram level. This format
+is created through the command {\tt quantize-lm}.
+
+\subsection{iARPA Format}
+This is an intermediate ARPA format in the sense that each entry of the file
+does not contain in the first position the full $n$-gram probability, but just its
+smoothed frequency, i.e.:\\
+\noindent
+{\tt ...\\
+f(z|x y) x y z bow(x y)\\
+...
+}
+
+\noindent
+This format is nevertheless properly managed by the {\tt compile-lm} command
+in order to generate a binary version or a correct ARPA version.
+
+
+\subsection{Binary Formats}
+Both ARPA and qARPA formats can be converted into a binary format 
+that allows for space savings on disk and a much quicker upload of
+the LM file.  Binary versions can be created with the command 
+{\tt compile-lm}, that produces files with  headers {\tt blmt} or {\tt Qblmt}.
+
+\noindent
+Moreover, for an even faster access you can store the ngrams in an inverted
+order (see Section~\ref{sec:inverted-lm});
+the files with inverted-ordered ngrams have headers  {\tt blmtI} or {\tt QblmtI}.
+
+%%%% LM QUANTIZATION & COMPILATION %%%%%
+\newpage
+\section{LM Pruning}
+Large LMs files can be pruned in a smart way by means of the command 
+{\tt prune-lm} that removes $n$-grams for which resorting to the back-off 
+results in a small loss. IRSTLM toolkit implements a method similar to the 
+Weighted Difference Method described in the paper {\em Scalable Backoff
+Language Models} by Seymore and Rosenfeld.
+
+\noindent
+The syntax is as follows:
+\begin{verbatim}
+$> prune-lm --threshold=1e-6,1e-6  train.lm.gz  train.plm
+\end{verbatim}
+Thresholds for each n-gram level, up from 2-grams, are based on empirical 
+evidence. Threshold zero results in no pruning. If less thresholds are specified,
+the right most is applied to the higher levels. Hence, in the above example we
+could have just specified one threshold, namely {\tt --threshold=1e-6}. 
+The effect of pruning is shown in the following messages of {\tt prune-lm}:
+
+\begin{verbatim}1-grams: reading 15059 entries
+2-grams: reading 142684 entries
+3-grams: reading 293685 entries
+done
+OOV code is 15058
+OOV code is 15058
+pruning LM with thresholds: 
+ 1e-06 1e-06
+savetxt: train.plm
+save: 15059 1-grams
+save: 138252 2-grams
+save: 194194 3-grams
+\end{verbatim}
+
+\noindent
+The saved LM table {\tt train.plm}  contains about 3\% less bigrams, and 34\%  
+less trigrams.
+Notice that the output of prune-lm is an ARPA LM file, while the input can be 
+either an ARPA or binary LM. 
+In order to measure the loss in accuracy introduced
+by pruning, perplexity of the resulting LM can be computed (see below).
+
+\paragraph{Warning:} the possible quantization should be performed after pruning.
+
+\paragraph{Warning:} 
+IRSTLM toolkit does not provide a reliable probability for the special
+1-gram composed by the ``sentence start symbol'' ({\tt <s>}) , because none
+should ever ask for it.  However, this pruning method requires the
+computation of the probability of this 1-gram.  Hence, (only) in this case
+the probability of this special 1-gram is arbitrarily set to 1.
+
+\newpage
+\section{LM Quantization}
+A language model file in ARPA  format, created with the IRST LM toolkit or
+with other tools, can be quantized and stored in a compact data structure, 
+called language model table.  Quantization can be performed by the command:
+
+\begin{verbatim}
+$> quantize-lm  train.lm train.qlm
+\end{verbatim}
+
+\noindent
+which  generates   the  quantized  version  {\tt train.qlm} that  encodes all probabilities and back-off 
+weights in 8 bits. The  output is a  modified ARPA format, called qARPA. Notice that quantized
+LMs reduce memory consumptions at the cost of some loss in performance. Moreover, probabilities
+of quantized LMs are not supposed to be properly normalized.
+
+\newpage
+\section{LM Compilation}
+LMs in ARPA, iARPA, and qARPA format can be stored in a compact binary table through the command:
+
+\begin{verbatim}
+$> compile-lm train.lm train.blm
+\end{verbatim}
+
+\noindent
+which generates the binary file {\tt train.blm} that can be quickly loaded in memory.  If the LM
+is really very large, {\tt compile-lm} can avoid to create the binary LM directly in memory through the 
+option {\tt -memmap 1}, which exploits the {\em Memory Mapping} mechanism in order to work as 
+much as possible on disk rather than in RAM. \\
+
+\begin{verbatim}
+$> compile-lm --memmap 1 train.lm train.blm
+\end{verbatim}
+\noindent
+This option clearly pays a fee  in terms of speed, but  is often the only way to proceed. It is also recommended 
+that the hard disk for the LM storage belongs to the computer on which the compilation is performed.
+
+\noindent
+Notice that most of the functionalities of {\tt compile-lm} (see below) apply to binary and quantized models. 
+
+\noindent
+By default, the command uses the directory ``/tmp'' for storing
+intermediate results.  For huge LMs, the temporary files can grow
+dramatically causing a ``disk full'' system error.  It is possible to
+explicitly set the directory used for temporary computation through the
+parameter ``--tmpdir''.
+\begin{verbatim}
+$> compile-lm --tmpdir=<mytmpdir> train.lm train.blm
+\end{verbatim}
+
+
+\subsection{Inverted order of ngrams}
+\label{sec:inverted-lm}
+For a faster access, the ngrams can be stored in inverted order with the following two commands:
+\begin{verbatim}
+$> sort-lm.pl -inv -ilm train.lm -olm train.inv.lm
+$> compile-lm train.inv.lm train.inv.blm --invert yes
+\end{verbatim}
+
+\paragraph{Warning:} The following pipeline is no more allowed!!
+
+\COMMENT{
+or with the following pipeline:
+}
+\begin{verbatim}
+$> cat train.lm | sort-lm.pl -inv | \
+   compile-lm /dev/stdin train.inv.blm --invert yes
+\end{verbatim}
+
+\newpage
+\section{Filtering a LM}
+A large LM can be filtered according to a word list through the command:
+
+\begin{verbatim}
+$> compile-lm  train.lm --filter list filtered.lm
+\end{verbatim}
+The resulting LM will only contain n-grams inside the provided list of words,
+with the exception of the 1-gram level, which by default is preserved identical
+to the original LM. This behavior can be changed by setting the option 
+{\tt --keepunigrams no}.  LM filtering can be useful once very large LMs can
+be specialized in advance to work on a particular portion of language.
+\noindent
+If the original LM is in binary format and is very large, {\tt compile-lm} can avoid to load it in memory,
+through the memory mapping option {\tt -memmap 1}.
+
+
+
+
+
+
+
+%%%% LM INTERFACE %%%%%%%%%
+\newpage
+\section{LM Interface}
+LMs are useful when they can be queried through another application in order to compute 
+perplexity scores or n-gram probabilities. IRSTLM provides two possible interfaces: 
+\begin{itemize}
+\item at the command level, through  {\tt compile-lm}
+\item at the c++ library level, mainly through methods of the class {\tt lmtable}
+\end{itemize}
+
+\noindent
+In the following, we will only focus on the command level interface. Details about
+the c++ library interface will be provided in a future version of this manual.  
+
+\subsection{Perplexity Computation}
+Assume we have estimated and saved the following LM:
+
+\begin{verbatim}
+$> tlm -tr=train.www -n=3 -lm=wb -te=test -o=train.lm -ps=no
+ n=49984 LP=308057.0419 PP=474.9041687 OVVRate=0.05007602433
+\end{verbatim}
+
+\noindent
+To compute the perplexity directly from the LM on disk, we can use the command:
+
+\begin{verbatim}
+$> compile-lm train.lm  --eval test
+ %% Nw=49984 PP=1064.40 PPwp=589.50 Nbo=38071 Noov=2503 OOV=5.01%
+\end{verbatim}
+Notice that {\tt PPwp} reports the contribution of OOV words to the perplexity. Each OOV word is indeed penalized by dividing the
+LM probability of the {\tt unk} word by  the quantity
+
+
+\centerline{{\tt DictionaryUpperBound} - {\tt SizeOfDictionary}}
+
+\noindent
+The OOV penalty can be modify by changing the {\tt DictionaryUpperBound} with the parameter {\tt --dub} (whose default value is set to $10^7$). \\
+
+\noindent
+The perplexity of the pruned LM can be computed with the command:
+\begin{verbatim}
+$> compile-lm train.plm --eval test --dub 10000000
+%% Nw=49984 PP=1019.69 PPwp=564.73 Nbo=39907 Noov=2503 OOV=5.01%
+\end{verbatim}
+Interestingly, a slightly better value is obtained which could be explained by the 
+fact that pruning has removed many unfrequent trigrams and has redistributed 
+their probabilities over more frequent bigrams.
+
+\noindent
+Notice that {\tt PPwp} reports the perplexity with a fixed dictionary upper-bound of 10 million words. Indeed:
+\begin{verbatim}
+$> tlm -tr=train.www -n=3 -lm=wb -te=test -o=train.lm -ps=no -dub=10000000 
+n=49984 LP=348396.8632 PP=1064.401254 OVVRate=0.05007602433
+\end{verbatim}
+
+\bigskip
+\noindent
+Again, if the LM is in binary format and is very large, {\tt compile-lm} can avoid to load it in memory,
+through the memory mapping option {\tt -memmap 1}.
+
+\bigskip
+\noindent
+By enabling the option ``{\tt --sentence yes}'', {\tt compile-lm} computes perplexity and related figures (OOV rate, number of backoffs, etc.) for each input sentence. The end of a sentence is identified by a given symbol ({\tt </s>} by default).
+\begin{verbatim}
+$> compile-lm train.plm --eval test --dub 10000000 --sentence yes	
+\end{verbatim}
+{\small 
+\begin{verbatim}
+%% sent_Nw=1 sent_PP=23.22 sent_PPwp=0.00 sent_Nbo=0 sent_Noov=0 sent_OOV=0.00%
+%% sent_Nw=8 sent_PP=7489.50 sent_PPwp=7356.27 sent_Nbo=7 sent_Noov=2 sent_OOV=25.00%
+%% sent_Nw=9 sent_PP=1231.44 sent_PPwp=0.00 sent_Nbo=14 sent_Noov=0 sent_OOV=0.00%
+%% sent_Nw=6 sent_PP=27759.10 sent_PPwp=25867.42 sent_Nbo=19 sent_Noov=1 sent_OOV=16.67%
+.....
+%% sent_Nw=5 sent_PP=378.38 sent_PPwp=0.00 sent_Nbo=39893 sent_Noov=0 sent_OOV=0.00%
+%% sent_Nw=15 sent_PP=4300.44 sent_PPwp=2831.89 sent_Nbo=39907 sent_Noov=1 sent_OOV=6.67%
+%% Nw=49984 PP=1019.69 PPwp=564.73 Nbo=39907 Noov=2503 OOV=5.01%
+\end{verbatim}
+}
+
+\bigskip
+\noindent
+Finally, tracing information with the {\tt --eval }  option are shown by setting 
+debug levels from 1 to 4 ({\tt --debug}):
+\begin{enumerate}
+\item reports the back-off level for each word
+\item adds the log-prob 
+\item adds the back-off weight
+\item check if probabilities sum up to 1.
+\end{enumerate}
+
+
+\subsection{Probability Computations}
+Word-by-word log-probabilities  can be computed as well from standard input with the command:
+\begin{verbatim}
+$> compile-lm train.lm --score yes < test
+
+> </s>  1 p= NULL
+> <s> <unk>     1 p= NULL
+> <s> <unk> of  1 p= -3.530047e+00 bo= 2
+> <unk> of the  1 p= -1.250668e+00 bo= 1
+> of the senate 1 p= -1.170901e+01 bo= 1
+> the senate (  1 p= -5.457265e+00 bo= 2
+> senate ( <unk>        1 p= -2.166440e+01 bo= 2
+....
+....
+\end{verbatim}
+
+\noindent
+the command reports the currently observed n-gram, 
+including {\tt\_unk\_} words, a dummy
+constant frequency 1, the log-probability of the n-gram, and the 
+number of back-offs performed by the LM.  
+
+\paragraph{Warning:} All cross-sentence $n$-grams are skipped. The 1-grams with the sentence start symbol are also skipped. In a $n$-grams all words before the sentence start symbol are removed. For $n$-grams, whose size is smaller than the LM order, probability is not computed, but a {\tt NULL} value is returned.
+
+
+%%%% LM INTERPOLATION %%%%%%%%%
+\newpage
+\section{LM Interpolation}
+We provide a convenient tool to estimate mixtures of LMs that have been already 
+created in one of the available formats.  The tool permits to estimate interpolation
+weights through the EM algorithm, to compute the perplexity, and to query the interpolated
+LM. 
+
+\noindent
+Data used in those examples can be found in the directory {\tt example/interpolateLM/},
+which represents the relative path for all the parameters of the referred commands.
+
+\noindent
+Interpolated LMs are defined by a configuration file in the following format:
+\begin{verbatim}
+3
+0.3 lm-file1
+0.3 lm-file2
+0.4 lm-file3
+\end{verbatim}
+
+\noindent
+The first number indicates the number of LMs to be interpolated, then each LM is specified
+by its weight and its file (either in ARPA or binary format). Notice that you can interpolate
+LMs with different orders\\
+
+\noindent
+Given an initial configuration file {\tt lmlist.init} (with arbitrary weights), new weights can be estimated
+through Expectation-Maximization on some text sample {\tt test} by running the command:
+\begin{verbatim}
+$> interpolate-lm lmlist.init --learn test
+\end{verbatim}
+\noindent
+New weights will be written in the updated configuration file, called by default {\tt lmlist.init.out}.
+You can also specify the name of the updated configuration file as follows:
+
+\begin{verbatim}
+$> interpolate-lm lmlist.init --learn test lmlist.final
+\end{verbatim}
+
+
+\noindent
+Similarly to {\tt compile-lm}, interpolated LMs can be queried through the option {\tt --score}
+
+\begin{verbatim}
+$> interpolate-lm lmlist.final --score yes < test
+\end{verbatim}
+
+\noindent
+and can return the perplexity of a given input text (``{\tt --eval text-file}''), optionally  at sentence level  by enabling the option ``{\tt --sentence yes}'',
+
+\begin{verbatim}
+$> interpolate-lm lmlist.final --eval test 
+$> interpolate-lm lmlist.final --eval test --sentence yes
+\end{verbatim}
+
+\bigskip
+\noindent
+If there are binary LMs in the list,  {\tt interpolate-lm} can avoid to load them in memory through the memory 
+mapping option {\tt -memmap 1}.
+
+
+\noindent
+The full list of options is:
+
+\begin{verbatim}
+--learn text-file   learn optimal interpolation for text-file
+--order n           order of n-grams used in --learn (optional)
+--eval text-file    compute perplexity on text-file
+--dub dict-size     dictionary upper bound (default 10^7)
+--score [yes|no]    compute log-probs of n-grams from stdin
+--debug [1-3]       verbose output for --eval option (see compile-lm)
+--sentence [yes|no] (compute perplexity at sentence level (identified
+                    through the end symbol)
+--memmap 1          use memory map to read a binary LM
+\end{verbatim}
+ 
+
+ 
+%%%% PARALLEL COMPUTATION %%%%%%%%%
+\newpage
+\section{Parallel Computation}
+This package provides facilities to build a gigantic LM in parallel in order to reduce computation time.
+The script implementing this feature is based on the {\tt SUN Grid Engine} software\footnote{http://www.sun.com/software/gridware}.
+
+\noindent
+To apply the parallel computation run the following script (instead of {\tt build-lm.sh}):
+
+\begin{verbatim}
+$> build-lm-qsub.sh -i "gunzip -c train.gz" -n 3  -o train.ilm.gz -k 5
+\end{verbatim}
+Besides the options of {\tt build-lm.sh}, parameters for the SGE manager can be provided through the following one:
+
+\begin{verbatim}
+   -q      parameters for qsub, e.g. "-q <queue>", "-l <resources>"
+\end{verbatim}
+
+\noindent
+The script performs the same {\em split-and-merge} policy described in Section~\ref{sec:giganticLM}, but some computation is performed in parallel (instead of sequentially) distributing the tasks on several machines.
+
+%%%% CHUNK LM %%%%%%%%%
+\newpage
+\section{Class and Chunk LMs}
+
+IRSTLM toolkit allows the use of class and chunk LMs, and a special
+handling of input tokens which are concatenation of $N \ge 1$ fields separated
+by the character \#, e.g.
+
+\begin{verbatim}
+   word#lemma#part-of-speech#word-class
+\end{verbatim}
+
+\noindent The processing is guided by the format of the file passed to
+Moses or {\tt compile-lm}: if it contains just the LM, either in textual or
+binary format, it is treated as usual; otherwise, it is supposed to have
+the following format:
+
+\begin{verbatim}
+LMMACRO <lmmacroSize> <selectedField> <collapse>
+<lmfilename>
+<mapfilename>
+\end{verbatim}
+
+\noindent where:
+\begin{verbatim}
+ LMMACRO is a reserved keyword
+ <lmmacroSize> is a positive integer
+ <selectedField> is an integer >=-1
+ <collapse> is a boolean value (true, false)
+ <lmfilename> is a file containing a LM (format compatible with IRSTLM)
+ <mapfilename> is an (optional) file with a (one|many)-to-one map
+\end{verbatim}
+
+\noindent The various cases are discussed with examples in the
+following. Data used in those examples can be found in the directory {\tt
+example/chunkLM/} which represents the relative path for all the parameters
+of the referred commands.  Note that texts with different tokens (words,
+POS, word\#POS pairs...) used either as input or for training LMs are all
+derived from the same multifield texts in order to allow direct comparison
+of results.
+
+\subsection{Field selection}
+
+The simplest case is that of the LM in {\tt <lmfilename>} referring just to
+one specific field of the input tokens. In this case, it is possible to
+specify the field to be selected before querying the LM through the integer
+{\tt <selectedField>} ($0$ for the first filed, $1$ for the
+second...). With the value $-1$, no selection is applied and the LM is
+queried with n-grams of whole strings.  The other parameters are set as:
+
+\begin{verbatim}
+ <lmmacroSize> : set to the size of the LM in <lmfilename>
+ <collapse>    : false
+\end{verbatim}
+
+\noindent The third line optionally reserved to {\tt <mapfilename>} does not exist.
+
+\bigskip
+\noindent
+Examples:
+
+\bigskip
+\noindent
+\thesubsection.a) selection of the second field:
+\begin{verbatim}
+$> compile-lm --eval test/test.w-micro cfgfile/cfg.2ndfield
+%% Nw=126 PP=2.68 PPwp=0.00 Nbo=0 Noov=0 OOV=0.00%
+\end{verbatim}
+
+\noindent
+\thesubsection.b) selection of the first field:
+\begin{verbatim}
+$> compile-lm --eval test/test.w-micro cfgfile/cfg.1stfield
+%% Nw=126 PP=9.71 PPwp=0.00 Nbo=76 Noov=0 OOV=0.00%
+\end{verbatim}
+
+\noindent The result of the latter case is identical to that obtained with
+the standard configuration involving just words:
+
+\bigskip
+\noindent
+\thesubsection.c) usual case on words:
+\begin{verbatim}
+$> compile-lm --eval test/test.w lm/train.en.blm 
+%% Nw=126 PP=9.71 PPwp=0.00 Nbo=76 Noov=0 OOV=0.00%
+\end{verbatim}
+
+
+\subsection{Class LMs}
+
+Possibly, a many-to-one or one-to-one map can be passed through the
+{\tt <mapfilename>} parameter which has the simple format:
+
+\begin{verbatim}
+w1 class(w1)
+w2 class(w2)
+ ...
+wM class(wM)
+\end{verbatim}
+
+
+\noindent The map is applied to each component of ngrams before the LM
+query. Examples:
+\bigskip
+
+\noindent \thesubsection.a) map applied to the second field:
+\begin{verbatim}
+$> compile-lm --eval test/test.w-micro cfgfile/cfg.2ndfld-map
+%% Nw=126 PP=16.40 PPwp=0.00 Nbo=33 Noov=0 OOV=0.00%
+\end{verbatim}
+
+
+
+\noindent \thesubsection.b) just to assess the correctness of the (16.2.a) result:
+\begin{verbatim}
+$> compile-lm --eval test/test.macro lm/train.macro.blm
+%% Nw=126 PP=16.40 PPwp=0.00 Nbo=33 Noov=0 OOV=0.00%
+
+
+\end{verbatim}
+
+
+\subsection{Chunk LMs}
+
+A particular processing is performed whenever fields are supposed to
+correspond to microtags, i.e. the per-word projections of chunk labels. By
+means of the {\tt <collapse>} parameter, it is possible to activate a
+processing aiming at collapsing the sequence of microtags defining a
+chunk. The chunk LM is then queried with ngrams of chunk labels, in an
+asynchronous manner with respect to the sequence of words, as in general
+chunks consist of more words.
+
+\noindent
+The collapsing operation is automatically activated if the sequence of
+microtags is:
+
+\begin{verbatim}
+ TAG( TAG+ TAG+ ... TAG+ TAG)
+\end{verbatim}
+
+\noindent
+Such a sequence is collapsed into a single chunk label (let us say {\tt
+CHNK}) as long as {\tt TAG(}, {\tt TAG+} and {\tt TAG)} are all mapped into
+the same label {\tt CHNK}. The map into different labels or a different
+use/position of characters $($, $+$ and $)$ in the lexicon of tags prevent
+the collapsing operation even if {\tt <collapse>} is set to {\tt true}. Of
+course, if {\tt <collapse>} is {\tt false}, no collapse is attempted.
+
+\paragraph{Warning:} In this context, it assumes an important role the parameter {\tt
+<lmmacroSize>}: it defines the size of the n-gram before the collapsing
+operation, that is the number of microtags of the actually processed
+sequence. {\tt <lmmacroSize>} should be large enough to ensure that after
+the collapsing operation, the resulting n-gram of chunks is at least of the
+size of the LM to be queried (the {\tt <lmfilename>}). As an example,
+assuming {\tt <lmmacroSize>=6}, {\tt <selectedField>=1}, {\tt
+<collapse>=true} and 3 the size of the chunk LM, the following input
+
+\begin{verbatim}
+ on#PP average#NP( 30#NP+ -#NP+ 40#NP+ cm#NP)
+\end{verbatim}
+
+\noindent will yield to query the LM with just the bigram {\tt (PP,NP)},
+instead of a more informative trigram; for this particular case, the value
+6 for {\tt <lmmacroSize>} is not enough.  On the other side, for efficiency
+reasons, it cannot be set to an unlimited valued. A reasonable value could
+derive from the average number of microtags per chunk (2-3), which means
+setting {\tt <lmmacroSize>} to two-three times the size of the LM in {\tt
+<lmfilename>}.  Examples:
+\bigskip
+
+\noindent \thesubsection.a) second field, micro$\rightarrow$macro map, collapse:
+\begin{verbatim}
+$> compile-lm --eval test/test.w-micro cfgfile/cfg.2ndfld-map-cllps
+%% Nw=126 PP=1.84 PPwp=0.00 Nbo=0 Noov=0 OOV=0.00%
+
+$> compile-lm --eval test/test.w-micro cfgfile/cfg.2ndfld-map-cllps -d=1
+%% Nw=126 PP=1.83774013 ... OOV=0.00% logPr=-33.29979642
+
+\end{verbatim}
+
+\noindent
+\thesubsection.b) whole token,  micro$\rightarrow$macro map, collapse:
+\begin{verbatim}
+$> compile-lm --eval test/test.micro cfgfile/cfg.token-map-cllps
+%% Nw=126 PP=1.84 PPwp=0.00 Nbo=0 Noov=0 OOV=0.00%
+\end{verbatim}
+
+\noindent
+\thesubsection.c)  whole token,  micro$\rightarrow$macro map, NO collapse:
+\begin{verbatim}
+$> compile-lm --eval test/test.micro cfgfile/cfg.token-map
+%% Nw=126 PP=16.40 PPwp=0.00 Nbo=0 Noov=0 OOV=0.00%
+\end{verbatim}
+\noindent Note that the configuration (16.3.c) gives the same result of that in
+example (16.2.b), as they are equivalent.
+
+\bigskip
+\noindent
+\thesubsection.d) As an actual example related to the ``warning'' note
+reported above, the following configuration with usual LM:
+
+\begin{verbatim}
+$> compile-lm --eval test/test.chunk lm/train.macro.blm -d=1
+Nw=73 PP=2.85754443 ... OOV=0.00000000% logPr=-33.28748842
+\end{verbatim}
+
+\noindent not necessarily yields the same log-likelihood ({\tt logPr}) nor the same perplexity ({\tt PP}) of case (16.3.a).
+In fact, concerning {\tt PP}, the length of the input sequence is definitely different (126 tokens before collapsing, 73 after that).
+Even the {\tt logPr} is different (-33.29979642 vs. -33.28748842) because in (16.3.a) some 6-grams ({\tt
+<lmmacroSize>} is set to 6) after collapsing reduce to $n$-grams of size less
+than 3 (the size of lm/train.macro.blm). By setting {\tt <lmmacroSize>} to
+a larger value (e.g. 8), the same {\tt logPr} will be computed.
+
+
+
+%%%% APPENDIX %%%%%%%%%
+\appendix
+
+
+\newpage
+\section{Reference Material}
+The following books contain basic introductions to statistical language modeling:
+\begin{itemize}
+\item {\em Spoken Dialogues with Computers}, by Renato DeMori, chapter 7.
+\item {\em Speech  and Language Processing},  by Dan  Jurafsky and  Jim Martin, chapter 6.
+\item {\em Foundations   of  Statistical   Natural  Language   Processing},  by C. Manning and H. Schuetze.
+\item {\em Statistical Methods for Speech Recognition}, by Frederick Jelinek.
+\item {\em Spoken Language Processing}, by Huang, Acero and Hon.
+\end{itemize}
+
+\noindent
+The following papers describe the IRST LM toolkit:
+\begin{itemize}
+
+\item Efficient data structures to handle huge language models:
+\begin{quote}
+Marcello Federico and Mauro Cettolo, {\em Efficient Handling of N-gram Language Models for Statistical Machine Translation}, In Proc. of the Second Workshop on Statistical Machine Translation, pp. 88--95, ACL, Prague, Czech Republic, 2007.
+\end{quote}
+
+\item Language Model quantization:
+\begin{quote}
+Marcello Federico and Nicola Bertoldi, {\em How Many Bits Are Needed To Store Probabilities for Phrase-Based Translation?}, In Proc. of the Workshop on Statistical Machine Translation. pp. 94-101, NAACL, New York City, NY, 2006. 
+\end{quote}
+
+
+\item Language Model adaptation with mixtures:
+\begin{quote}
+Marcello Federico and Nicola Bertoldi, {\em Broadcast news LM adaptation over time}, Computer Speech and Language. 18(4): pp. 417-435, October, 2004.
+\end{quote}
+\item Language Model adaptation with MDI:
+\begin{quote}
+Marcello Federico, {\em Efficient LM Adaptation through MDI Estimation}. In Proc. of Eurospeech, Budapest, Hungary, 1999.
+\end{quote}
+\end{itemize}
+
+\newpage
+\section{Release Notes}
+
+\subsection{Version 3.2}
+\begin{itemize}
+\item Quantization of probabilities
+\item Efficient run-time data structure for LM querying 
+\item Dismissal of MT output format
+\end{itemize}
+
+\subsection{Version 4.2}
+\begin{itemize}
+\item Distinction between open source and internal Irstlm tools
+\item More memory efficient versions of binarization and quantization commands
+\item Memory mapping of run-time LM
+\item Scripts and data structures for the estimation and handling of gigantic LMs 
+\item Integration of IRSTLM into Moses Decoder
+\end{itemize}
+
+\subsection{Version 5.00}
+\begin{itemize}
+\item Fixed bug in the documentation 
+\item General script {\tt build-lm.sh} for the estimation of large LMs.
+\item Management of iARPA file format.
+\item Bug fixes
+\item Estimation of LM over a partial dictionary.
+\end{itemize}
+
+
+\subsection{Version 5.04}
+\begin{itemize}
+\item Extended documentation with ShiftBeta smoothing. 
+\item Smoothing parameter of ShiftBeta can be set manually.
+\item Robust handling for smoothing parameters of ModifiedShiftBeta.
+\item Fixed probability checks in TLM.
+\item Parallel estimation of gigantic LM through SGE
+\item Better management of sub dictionary with build-lm.sh   
+\item Minor bug fixes
+\end{itemize}
+
+\subsection{Version 5.05}
+\begin{itemize}
+\item (Optional) computation of OOV penalty in terms of single OOV word instead of OOV class
+\item Extended use of OOV penalty to the standard input LM scores of compile-lm. 
+\item Minor bug fixes
+\end{itemize}
+
+\subsection{Version 5.10}
+\begin{itemize}
+\item Extended ngt to compute statistics for approximated Kneser-Ney smoothing
+\item New implementation of approximated Kneser-Ney smoothing method
+\item Minor bug fixes
+\item More to be added here ....
+\end{itemize}
+
+\subsection{Version 5.20}
+\begin{itemize}
+\item Improved tracing of back-offs
+\item Added command prune-lm  (thanks to Fabio Brugnara)
+\item Extended lprob function to supply back-off weight/level information
+\item Improved back-off handling of OOV words with quantized LM
+\item Added more debug modalities to compile-lm
+\item Fixed minor bugs in regression tests
+\item Updated documentation
+\end{itemize}
+
+\subsection{Version 5.21}
+\begin{itemize}
+\item Addition of interpolate-lm 
+\item Added LM filtering to compile-lm
+\item Improved regression tests
+\item Integration of interpolated LMs in Moses
+\item Extended tests on compilers and platforms
+\item Improved documentation with website
+\end{itemize}
+
+\subsection{Version 5.22}
+\begin{itemize}
+\item Use of AutoConf/AutoMake toolkit compilation and installation
+\end{itemize}
+
+\subsection{Version 5.30}
+\begin{itemize}
+\item Support for a safe management of LMs with a total amount of $n$-grams larger than 250 million
+\item Use of a new parameter to specify a directory for temporary computation because the default ("/tmp") could be too small
+\item Improved a safer method of concatenation of gzipped sub lms
+\item Improved management of log files
+\end{itemize}
+
+\subsection{Version 5.40}
+\begin{itemize}
+\item Merging of internal-only tlm code into the public version
+\item Updated documentation into the public version
+\item Included documentation into the public version
+\end{itemize}
+
+\subsection{Version 5.50}
+
+\begin{itemize}
+\item {\bf 5.50.01}
+\begin{itemize}
+\item binary saving directly with tlm
+\item speed improvement through 
+\begin{itemize}
+\item caching of probability and states of ngrams in the LM interface
+\item storing of ngrams in inverted order
+\end{itemize}
+\end{itemize}
+
+\item {\bf 5.50.02}
+\begin{itemize}
+\item optional creation of documentation
+\item improved documentation
+\item optional computation of the perplexity at sentence-level
+\end{itemize}
+
+\end{itemize}
+
+\subsection{Version 5.60}
+\begin{itemize}
+\item {\bf 5.60.01}
+\begin{itemize}
+\item handling of class/chunk LMs with both compile-lm and interpolate-lm
+\item improved pruning strategy to handle with sentence-start symbols
+\item improved documentation and examples
+\end{itemize}
+
+\end{itemize}
+
+
+\COMMENT{
+\subsection{Version 5.xx}
+\begin{itemize}
+\item {\bf 5.xx.01}
+\begin{itemize}
+\item 
+\end{itemize}
+\end{itemize}
+}
+
+\end{document}

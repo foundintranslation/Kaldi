@@ -1,0 +1,38 @@
+#! /bin/sh
+
+PACKAGE_NAME=irstlm
+PACKAGE_VERSION=`cat RELEASE`
+prefixdir=$1
+
+bininstallname=${PACKAGE_NAME}-${PACKAGE_VERSION}-bin
+libinstallname=${PACKAGE_NAME}-${PACKAGE_VERSION}-lib
+srcinstallname=${PACKAGE_NAME}-${PACKAGE_VERSION}
+
+cwd=`pwd`
+echo $cwd
+echo $bininstallname
+echo $libinstallname
+
+mkdir -p tmp$$
+pushd tmp$$
+svn export https://hermessvn.fbk.eu/svn/hermes/software/irstlm/trunk
+pushd trunk
+tar czf ../$srcinstallname.tgz *
+zip -r ../$srcinstallname.zip *
+popd
+popd
+mv tmp$$/$srcinstallname.tgz tmp$$/$srcinstallname.zip .
+\rm -r tmp$$
+
+pushd ${prefixdir}
+
+tar czf ${bininstallname}.tgz bin
+zip -r -y ${bininstallname}.zip bin
+mv ${bininstallname}.tgz ${bininstallname}.zip $cwd/
+
+tar czf ${libinstallname}.tgz lib include
+zip -r -y ${libinstallname}.zip lib include
+mv ${libinstallname}.tgz ${libinstallname}.zip $cwd/
+
+popd
+
