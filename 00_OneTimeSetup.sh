@@ -11,6 +11,6 @@ cd tools/ATLAS
 mkdir MyObj
 cd MyObj
 
-../configure
-make
+../configure --shared
+make -j5
 sudo make install
